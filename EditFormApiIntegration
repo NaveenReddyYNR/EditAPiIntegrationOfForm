@@ -1,0 +1,276 @@
+import { yupResolver } from '@hookform/resolvers/yup';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { Button, Container, Grid, Typography, TextField } from '@mui/material';
+import { makeStyles } from '@mui/styles';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate, useParams } from 'react-router-dom';
+import * as yup from 'yup';
+import ErrorAlert from '../../../../components/alert/ErrorAlert';
+import SuccessAlert from '../../../../components/alert/SuccessAlert';
+import { FormProvider, RHFTextField } from '../../../../components/hook-form';
+import Loader from '../../../../components/loader/Loader';
+import { BAD_REQUEST, BAD_RESPONSE, ERROR_MSG, GET_SUCCESS, NETWORK_ERROR, ACCESS_FORBIDDEN, ACCESS_FORBIDDEN_MSG } from '../../../../constant';
+import { getPcMarket, updateLaunchPcToMarket } from '../../../../services/pcMarketTrackerService';
+
+const useStyles = makeStyles((theme) => ({
+    btn: {
+        margin: 10,
+        width: 150,
+    },
+    btnContainer: {
+        marginTop: 40,
+    },
+    section: {
+        marginTop: 20,
+        border: '1px solid',
+        borderColor: theme.palette.primary.main,
+        padding: 20,
+        borderRadius: 10,
+    },
+    sectionContainer: {
+        boarder: '1px solid #EBF8F2',
+        padding: 20,
+        borderRadius: 10,
+    },
+    mandatory: {
+        color: 'red',
+    },
+}));
+
+const validationSchema = yup.object({
+    buyPrice: yup
+        .string()
+        .required('Buy price is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Offer Price must be valid'),
+    sellPrice: yup
+        .string()
+        .required('Sell price is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Sell Price must be valid'),
+    buyMaxQuantityPerUser: yup
+        .string()
+        .required('Max buy quantity is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Max buy qty must be valid'),
+    buyMinQuantityPerUser: yup
+        .string()
+        .required('Min purchase buy is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Min buy qty must be valid'),
+    sellMaxQuantityPerUser: yup
+        .string()
+        .required('Max sell quantity is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Max sell qty must be valid'),
+    sellMinQuantityPerUser: yup
+        .string()
+        .required('Min sell quantity is required')
+        .matches(/^(0*[1-9][0-9]*(\.[0-9]+)?|0+\.[0-9]*[1-9][0-9]*)$/, 'Min sell qty must be valid'),
+});
+
+export default function EditLaunchPcMarket() {
+    const classes = useStyles();
+    const navigate = useNavigate();
+    const { id } = useParams();
+    const [alertMsg, setAlertMsg] = useState('');
+    const [isSuccess, setSuccess] = useState(false);
+    const [isLoading, setLoading] = useState(false);
+    const [isError, setError] = useState(false);
+    const [pcData, setPcData] = useState(null);
+
+    const initialValues = {
+        buyPrice: '',
+        sellPrice: '',
+        buyMaxQuantityPerUser: '',
+        buyMinQuantityPerUser: '',
+        sellMaxQuantityPerUser: '',
+        sellMinQuantityPerUser: '',
+    };
+
+    const methods = useForm({
+        mode: 'onChange',
+        resolver: yupResolver(validationSchema),
+        defaultValues: initialValues,
+    });
+    const { handleSubmit, setValue } = methods;
+
+    const fetchPcMarket = async () => {
+        setLoading(true)
+        const res = await getPcMarket(id)
+        if (res?.status === GET_SUCCESS) {
+            setPcData(res?.data)
+            setLoading(false)
+        }
+        if (res.code === BAD_REQUEST) {
+            setLoading(false);
+            if (res?.response?.status === ACCESS_FORBIDDEN) {
+                setAlertMsg(res?.response?.data.message || res?.response?.data || ACCESS_FORBIDDEN_MSG);
+                setError(true);
+            }
+            else {
+                setError(true);
+                setAlertMsg(res?.response?.data.message || res?.response?.data?.error  || res?.response?.data || ERROR_MSG);
+            }
+        }
+        if (res.code === NETWORK_ERROR) {
+            setLoading(false);
+            setError(true);
+            setAlertMsg(res?.message || ERROR_MSG);
+        }
+        setLoading(false)
+
+    }
+    const onSubmit = async (data) => {
+        setLoading(true)
+        setError(false)
+        setAlertMsg('')
+        console.log(data)
+        const res = await updateLaunchPcToMarket(id, data)
+        if (res.status === GET_SUCCESS) {
+            setAlertMsg(res?.data?.message || "Player Token Secondary Market Updated")
+            setLoading(false)
+            setSuccess(true)
+            setTimeout(() => {
+                navigate(-1)
+            }, 2000);
+        }
+        if (res.code === BAD_REQUEST) {
+            setLoading(false);
+            if (res?.response?.status === ACCESS_FORBIDDEN) {
+                setAlertMsg(res?.response?.data.message || res?.response?.data || ACCESS_FORBIDDEN_MSG);
+                setError(true);
+            }
+            else {
+                setError(true);
+                setAlertMsg(res?.response?.data.message || res?.response?.data?.error  || res?.response?.data || ERROR_MSG);
+            }
+        }
+        if (res.code === BAD_RESPONSE) {
+            setError(true)
+            setAlertMsg(res?.response?.data?.error || ERROR_MSG)
+            setLoading(false)
+        }
+        if (res.code === NETWORK_ERROR) {
+            setLoading(false);
+            setError(true);
+            setAlertMsg(res?.message || ERROR_MSG);
+        }
+        setLoading(false)
+    };
+
+
+    useEffect(() => {
+        fetchPcMarket()
+    }, [])
+
+    useEffect(() => {
+        setValue('buyPrice', pcData?.buyPrice);
+        setValue('sellPrice', pcData?.sellPrice);
+        setValue('buyMaxQuantityPerUser', pcData?.buyMaxQuantityPerUser);
+        setValue('buyMinQuantityPerUser', pcData?.buyMinQuantityPerUser);
+        setValue('sellMaxQuantityPerUser', pcData?.sellMaxQuantityPerUser);
+        setValue('sellMinQuantityPerUser', pcData?.sellMinQuantityPerUser);
+    }, [pcData]);
+
+
+    return (
+        <>
+            <Container maxWidth="xl">
+                <Button
+                    variant="outlined"
+                    onClick={() => navigate(-1)}
+                    style={{ width: 140, marginBottom: '2%' }}
+                >
+                    <ChevronLeftIcon /> Back Page
+                </Button>
+                <span style={{ display: 'flex' }}>
+                    Player Counter
+                    <ChevronRightIcon /> Market Tracker
+                    <ChevronRightIcon />  Edit
+                </span>
+                <FormProvider methods={methods} onSubmit={handleSubmit(onSubmit)}>
+                    <div className={classes.section} style={{ padding: '3%' }}>
+                        <Grid container mb={3}>
+                            <Grid item xs={12} sm={4} md={3}>
+                                <Typography>
+                                    Minted Player Counter
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={4} md={4}>
+                                <Typography>
+                                    {`${pcData?.firstName} ${pcData?.lastName}`}
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                        <Grid container mb={2} spacing={6}>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Buy Price (in SPQ)
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="buyPrice" placeholder="Eg: 25.3" />
+                            </Grid>
+                        </Grid>
+                        <Grid container mb={2} spacing={6}>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Sell Price (in SPQ)
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="sellPrice" placeholder="Eg: 25.3" />
+                            </Grid>
+                        </Grid>
+                        <Grid container mb={2} spacing={6}>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Max Buy Qty per Txn
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="buyMaxQuantityPerUser" placeholder="Eg: 100" />
+                            </Grid>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Min Buy Qty per Txn
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="buyMinQuantityPerUser" placeholder="Eg: 10" />
+                            </Grid>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Max Sell Qty per Txn
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="sellMaxQuantityPerUser" placeholder="Eg: 100" />
+                            </Grid>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Min Sell Qty per Txn
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <RHFTextField name="sellMinQuantityPerUser" placeholder="Eg: 10" />
+                            </Grid>
+                        </Grid>
+                        <Grid container mb={2} spacing={6}>
+                            <Grid item xs={12} sm={8} md={3}>
+                                <Typography>
+                                    Reward date
+                                    <span className={classes.mandatory}>*</span>
+                                </Typography>
+                                <TextField id="rewardDate" fullWidth value={pcData?.rewardDate} placeholder="Eg: 10" disabled />
+                            </Grid>
+                        </Grid>
+                    </div>
+                    <Grid container justifyContent="end" className={classes.btnContainer}>
+                        <Button variant="outlined" className={classes.btn} onClick={() => navigate(-1)}>
+                            Cancel
+                        </Button>
+                        <Button variant="contained" type="submit" className={classes.btn}>
+                            Update PC
+                        </Button>
+                    </Grid>
+                </FormProvider>
+            </Container>
+            {<SuccessAlert isSuccess={isSuccess} setSuccess={setSuccess} alertMsg={alertMsg} />}
+            <ErrorAlert isError={isError} setError={setError} alertMsg={alertMsg} />
+            {isLoading && <Loader />}
+        </>
+    );
+}
